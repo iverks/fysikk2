@@ -55,12 +55,12 @@ def draw_interactive(xs, V, E, psi, N):
     plt.show()
 
 def finite_square_well(N, a, U):
-    x_min = 0-0.5
-    x_max = a+0.5
+    x_min = 0-1
+    x_max = a+1
     dx = (x_max-x_min)/(N-1)
 
     xs = np.linspace(x_min, x_max, N)
-    V = [0 if x >= 0 and x < a else U for x in xs]
+    V = np.array([0 if x >= 0 and x < a else U for x in xs])
     H = np.zeros((N, N))
     for i in range(N):
         H[i][i] = (1/dx**2+V[i])
@@ -71,15 +71,15 @@ def finite_square_well(N, a, U):
     E, psi = linalg.eigh(H)
     return xs, V, E, psi
 
-def find_info(E, U_0):
-    real_E = lambda E: (E + U_0)*2*electron_mass/hbar**2
+def find_info(E):
+    # in here we assume SI units
     for state in range(6):
-        E_n = real_E(E[state])
+        E_n = E[state]
         # E = h*f => f = E/h
         f_n = E_n/Planck
         wavelength = "Ground state does not have"
         if state != 0:
-            grnd_E = real_E(E[0])
+            grnd_E = E[0]
             delta_E = E_n - grnd_E
             frequency = delta_E/Planck
             # lambda*f = c => lambda = c/f
@@ -89,32 +89,44 @@ def find_info(E, U_0):
 
 
 def main():
-    a = 1
-    U = 200 # J*kg/hbar^2
-    N = 1000
+    a = 10 # Unit of a is bohr radius = 5.29177210903(80)×10−11 m
+    U = 1.5 # Unit of U is Hartree = 4.3597447222071(85)×10−18 J
+    N = 1000 
     xs, V, E, psi = finite_square_well(N, a, U)
     
-    find_info(E, 0)
+    # draw_interactive(xs, V, E, psi, N) # In this one the units are wrong
 
-    # draw_interactive(xs, V, E, psi, N)
+    # Converting to SI units
+    hartree = 4.3597447222071*10**-18
+    bohr = 5.29177210903*10**-11
+    E = E * hartree
+    xs = xs * bohr
+    V = V * hartree
+    psi = psi * hartree
+    find_info(E)
 
     # Plot 16 lowest eigenstates
-    # print(E[:16])
-    # fig, axs = plt.subplots(4, 4)
-    # for y in range(4):
-    #     for x in range(4):
-    #         i = y*4 + x
-    #         axs[x, y].set_title(f"{i} state")
-    #         axs[x, y].plot(xs, psi[:, i])
-    #         axs[x, y].grid()
-    # plt.show();
+    print(E[:16])
+    fig, axs = plt.subplots(4, 4, sharex=True, sharey=True)
+    plt.xlabel("metres")
+    plt.ylabel("Joules")
+    for y in range(4):
+        for x in range(4):
+            i = y*4 + x
+            axs[x, y].set_title(f"{i} state")
+            axs[x, y].plot(xs, psi[:, i])
+            axs[x, y].grid()
+    plt.subplots_adjust(wspace=0.4, hspace=0.4)
+    plt.show();
 
-    # pot, = plt.plot(xs, V)
-    # grnd, = plt.plot(xs, E[0] + psi[:,0])
-    # first, = plt.plot(xs, E[1] + psi[:,1])
-    # scnd, = plt.plot(xs, E[2] + psi[:,2])
-    # plt.legend([pot, grnd, first, scnd], ["potential", "ground state", "first excited state", "second excited state"])
-    # plt.show()
+    pot, = plt.plot(xs, V)
+    grnd, = plt.plot(xs, E[0] + psi[:,0])
+    first, = plt.plot(xs, E[1] + psi[:,1])
+    scnd, = plt.plot(xs, E[2] + psi[:,2])
+    plt.xlabel("metres")
+    plt.ylabel("Joules")
+    plt.legend([pot, grnd, first, scnd], ["potential", "ground state", "first excited state", "second excited state"])
+    plt.show()
 
 if __name__=="__main__":
     main()
