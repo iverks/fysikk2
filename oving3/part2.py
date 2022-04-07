@@ -2,15 +2,14 @@ import matplotlib.pyplot as plt
 import matplotlib.widgets as wdgt
 import numpy as np
 from scipy import linalg
-from scipy.constants import speed_of_light, pi, electron_mass, hbar, Planck, Avogadro
+from scipy.constants import speed_of_light, Planck, Avogadro, electron_mass, proton_mass, electron_volt
 
 def draw_interactive(xs, V, E, psi, N):
     fig, ax = plt.subplots()
     pot, = plt.plot(xs, V)
-    # plt.ylim(-200, 1500)
-    schrod, = plt.plot(xs, E[0]+psi[:,0]*1000)
+    # plt.ylim(-20e-14, 15e-13)
+    schrod, = plt.plot(xs, E[0]+psi[:,0])
     plt.subplots_adjust(bottom=0.25)
-    pickable_states = [i for i in range(10)] + [10*i for i in range(1, 10)] + [25*i for i in range(4, 8+1)]
     stateax = plt.axes([0.25, 0.15, 0.65, 0.03])
     state_number = wdgt.Slider(
         ax=stateax,
@@ -23,13 +22,13 @@ def draw_interactive(xs, V, E, psi, N):
 
     def update(_):
         state = state_number.val
-        schrod.set_ydata(E[state]+psi[:,state]*1000)
+        schrod.set_ydata(E[state]+psi[:,state])
         fig.canvas.draw_idle()
 
     state_number.on_changed(update)
 
     plt.show()
-    
+
 def find_info(E):
     for state in range(6):
         E_n = E[state]
@@ -47,55 +46,82 @@ def find_info(E):
 
 
 def part2():
+    # Constants not in scipy
+    hartree = 4.3597447222071*10**-18 # Unit: Joules/hartree
+    bohr = 5.29177210903*10**-11 # Unit: metres/bohr radii
+
+    # Constants from the material
+    U_0 = 943*10**3/Avogadro/hartree # current unit: hartree
+    r_0 = 1.08*10**-10/bohr # current unit: bohr radii
+    alpha = 2.73*10**10*bohr # current unit: bohr radii
+    m_nitrogen = 14 # Unit: proton mass
+    m_reduced = m_nitrogen/2 #m*m/(m+m) 
+    m = m_reduced*proton_mass/electron_mass # Converted to electron masses (hartree units)
+
+    # Borders and resolution
     N = 2000
-    x_min = 0.8
-    x_max = 3
+    x_min = 7.5*r_0/10 
+    x_max = r_0*2.5
     dx = (x_max-x_min)/(N-1)
 
     xs = np.linspace(x_min, x_max, N)
 
-    U_0 = 943 #*10**3 # current unit: kJ/mol
-    r_0 = 1.08 #*10**-10/bohr # current unit: m*10^-10
-    alpha = 2.73 #*10**10*bohr # current unit: m^-1 * 10^10
-
     V = U_0 + U_0 *(np.exp(-2*alpha*(xs-r_0))-2*np.exp(-alpha*(xs-r_0))) # current unit: kJ/mol
-
-    # Converting to hartree units
-    hartree = 4.3597447222071*10**-18 # Unit: Joules/hartree
-    # V = V * 10**3 /Avogadro /hartree # Current unit: hartree
 
     H = np.zeros((N, N))
     for i in range(N):
-        H[i][i] = (1/dx**2+V[i])
+        H[i][i] = 1/(m*dx**2)+V[i]
         if i > 0:
-            H[i][i-1] = -1/(2*dx**2)
+            H[i][i-1] = -1/(m*2*dx**2)
         if i < N-1:
-            H[i][i+1] = -1/(2*dx**2)
+            H[i][i+1] = -1/(m*2*dx**2)
     E, psi = linalg.eigh(H)
 
      # Converting to SI units
-    hartree = 4.3597447222071*10**-18
-    bohr = 5.29177210903*10**-11
     E = E * hartree
     xs = xs * bohr
     V = V * hartree
-    psi = psi * hartree
+    psi = psi * hartree  # Done only for visual reasons
 
     find_info(E)
 
-    draw_interactive(xs, V, E, psi, N)
+    # Converting to nice plotting units
+    E = E/electron_volt
+    xs = xs/10e-10
+    V = V/electron_volt
+    psi = psi/electron_volt/20
 
-    fig, axs = plt.subplots(2, 3)
-    pot, = axs[0, 0].plot(xs, V)
-    axs[0, 0].legend([pot], ["Potential"])
+    # draw_interactive(xs, V, E, psi, N)
+
+    # fig, axs = plt.subplots(2, 3)
+    # pot, = axs[0, 0].plot(xs, V)
+    # axs[0, 0].legend([pot], ["Potential"])
+    # for i in range(1, 6):
+    #     x = i//3
+    #     y = i%3
+    #     line, = axs[x, y].plot(xs, psi[:, i-1])
+    #     axs[x, y].legend([line], [f"State {i-1}"])
+    #     plt.xlabel("metres")
+    #     plt.ylabel("Joules")
+    # plt.show()
+
+    pot, = plt.plot(xs, V)
+    ax = plt.gca()
+    legend_funcs = [pot]
+    legend_texts = ["Potential"]
     for i in range(1, 6):
         x = i//3
         y = i%3
-        line, = axs[x, y].plot(xs, psi[:, i-1])
-        axs[x, y].legend([line], [f"State {i-1}"])
-        plt.xlabel("metres")
-        plt.ylabel("Joules")
+        color = next(ax._get_lines.prop_cycler)['color']
+        line, = plt.plot(xs, E[i] + psi[:, i-1], color=color)
+        line, = plt.plot(xs, E[i] + np.zeros_like(xs), color=color, linestyle="--")
+        legend_funcs.append(line)
+        legend_texts.append(f"State {i-1}")
+    plt.legend(legend_funcs, legend_texts)
+    plt.xlabel("Ångstrom")
+    plt.ylabel("Electron volts")
     plt.show()
+
 
 
 if __name__=="__main__":
